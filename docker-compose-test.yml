@@ -2,7 +2,7 @@ version: '3.5'
 services:
   adminpanel:
     build:
-      context: ../adminpage
+      context: ./adminpage
       dockerfile: Dockerfile
       args:
         PYTHON_VERSION: 3.7
@@ -17,7 +17,7 @@ services:
   db:
     image: db
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile.db
     restart: always
     env_file:

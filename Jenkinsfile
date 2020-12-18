@@ -2,34 +2,71 @@ pipeline {
   agent any
   stages {
     stage('Test') {
-      agent {
-        docker {
-          image 'docker/compose'
-        }
-
-      }
       steps {
         echo 'Testing..'
-        sh '''docker-compose -f compose/docker-compose-test.yml build
-docker-compose -f compose/docker-compose-test.yml up -d
-sleep 3
-docker-compose -f compose/docker-compose-test.yml exec -T adminpanel python manage.py makemigrations
-docker-compose -f compose/docker-compose-test.yml exec -T adminpanel python manage.py migrate
-docker-compose -f compose/docker-compose-test.yml exec -T adminpanel pytest'''
+        sh '''
+          ln -s docker-compose-test.yml docker-compose.yml
+          echo "Building test images..."
+          docker-compose build --no-cache
+          docker-compose up -d
+          echo "Waiting for database to go up..."
+          docker-compose exec -T adminpanel bash -c "while !</dev/tcp/db/5432; do sleep 1; done;"  
+          echo "Making migrations..."
+          docker-compose exec -T adminpanel python manage.py makemigrations
+          docker-compose exec -T adminpanel python manage.py migrate
+          echo "Running tests..."
+          docker-compose exec -T adminpanel pytest
+          echo "done"
+          '''
+      }
+      post {
+        cleanup {
+          echo 'Cleanup...'
+          sh 'docker-compose down -v --rmi all && rm docker-compose.yml'
+        }
+      }
+    }
+
+    stage('Build') {
+      environment {
+        PYTHON_VERSION = credentials('python-version')
+      }
+      steps {
+        echo 'Building..'
+        script {
+          dockerInstanceDjango = docker.build("winnerokay/sna-app", '--build-arg PYTHON_VERSION=$PYTHON_VERSION ./adminpage')
+	  dockerInstanceNginx = docker.build("winnerokay/sna-app-nginx", './nginx')
+        }
       }
     }
     
-    stage('Build') {
+    stage('Migrate'){
       steps {
-        echo 'Building..'
+        echo 'Making migrations to the db...' 
       }
     }
-
-    stage('Deploy') {
+    
+    stage('Push to registry') {
+      environment {
+        registryCredentialSet = 'dockerhub'
+      }
       steps {
-        echo 'Deploying....'
+        echo 'Publishing....'
+        script{
+          docker.withRegistry('', registryCredentialSet){
+            dockerInstanceDjango.push("${env.BUILD_NUMBER}")
+            dockerInstanceDjango.push("latest")
+	    dockerInstanceNginx.push("${env.BUILD_NUMBER}")
+            dockerInstanceNginx.push("latest")
+          }
+        }
       }
     }
-
+    
+    stage('Deploy'){
+      steps {
+        echo 'Deploying...'
+      }
+    }
   }
 }
