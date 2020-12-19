@@ -34,15 +34,19 @@ pipeline {
       steps {
         echo 'Building..'
         script {
-          dockerInstanceDjango = docker.build("winnerokay/sna-app", '--build-arg PYTHON_VERSION=$PYTHON_VERSION ./adminpage')
-	  dockerInstanceNginx = docker.build("winnerokay/sna-app-nginx", './nginx')
+          dockerInstanceDjango = docker.build("winnerokay/sna-app", '-t latest --build-arg PYTHON_VERSION=$PYTHON_VERSION ./adminpage')
+          dockerInstanceNginx = docker.build("winnerokay/sna-app-nginx", '-t latest ./nginx')
         }
       }
     }
-    
     stage('Migrate'){
+      environment {
+        ENV_FILE = credentials('production-envfile')
+      }
+  
       steps {
-        echo 'Making migrations to the db...' 
+        echo 'Making migrations to the db...'
+        sh ''' docker run --env-file $ENV_FILE -e POSTGRES_SERVER=$(getent hosts db_server | awk "{ print $1 }") winnerokay/sna-app:latest bash -c "python manage.py makemigrations && python manage.py migrate"'''
       }
     }
     
@@ -54,9 +58,9 @@ pipeline {
         echo 'Publishing....'
         script{
           docker.withRegistry('', registryCredentialSet){
-            dockerInstanceDjango.push("${env.BUILD_NUMBER}")
+            dockerInstanceDjango.push("${env.GIT_COMMIT}")
             dockerInstanceDjango.push("latest")
-	    dockerInstanceNginx.push("${env.BUILD_NUMBER}")
+            dockerInstanceNginx.push("${env.GIT_COMMIT}")
             dockerInstanceNginx.push("latest")
           }
         }

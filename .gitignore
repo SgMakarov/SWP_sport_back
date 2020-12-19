@@ -7,7 +7,7 @@ compose/*.sh
 __pycache__/
 /nginx/logs/error.log
 /nginx/logs/access.log
-/compose/.env
+.env
 .coverage
 .coveragerc
 htmlcov/
