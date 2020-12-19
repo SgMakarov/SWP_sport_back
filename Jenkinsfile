@@ -71,9 +71,28 @@ pipeline {
     }
 
     stage('Deploy') {
+      environment {
+        ansibleInventoryFile = credentials('ansible-inventory-web')
+        productionEnvfile = credentials('production-envfile')
+      }
       steps {
         echo 'Deploying...'
-        sh 'pwd'
+        sh 'ls -la'
+        // sh 'ansible-playbook -i $ansibleInventoryFile -e "envfilePath=@$productionEnvfile" deploy_web.yml'
+        // sh 'mv \$productionEnvfile ./production_env'
+       
+        // ansiblePlaybook("deploy_web.yml"){
+        //   inventoryPath('$ansibleInventoryFile')
+        //   extraVars {
+        //     extraVar("envfilePath", "$productionEnvfile", false)
+        //   }
+        // }
+      
+        ansiblePlaybook(
+          playbook: "deploy_web.yml",
+          inventory: "$ansibleInventoryFile",
+          extras: '-e envfilePath=$productionEnvfile'
+        )
       }
     }
 

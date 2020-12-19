@@ -1,0 +1,46 @@
+- name: deploy web app
+  hosts: snafinal_web
+  become: true
+  vars:
+    envfilePath: .env
+  tasks:
+
+    - name: Get running containers
+      shell: docker ps -aq
+      register: running_containers
+
+    - name: Stop all docker containers
+      shell: docker stop $(docker ps -aq)
+      when: running_containers.stdout | length > 0
+
+    - name: Delete all stopped docker containers
+      shell: docker rm $(docker ps -aq)
+      when: running_containers.stdout | length > 0
+
+    - name: Remove unused/dangling image
+      shell: docker image prune -af
+
+    - name: Get db_server ip
+      shell: "getent hosts db_server | awk '{ print $1 }'"
+      register: db_server_ip
+
+    - name: Copy production compose
+      copy:
+        src: ./docker-compose-sna-prod.yml
+        dest: /root/docker-compose.yml
+    
+    - name: Copy production env
+      copy:
+        src: "{{ envfilePath }}"
+        dest: /root/.env
+
+    - name: Run docker-compose
+      shell: docker-compose -f /root/docker-compose.yml up -d
+      environment:
+        POSTGRES_SERVER: "{{ db_server_ip.stdout }}"
+
+    - name: Collect statics 
+      shell: docker-compose -f /root/docker-compose.yml exec -T adminpanel bash -c './manage.py collectstatic --noinput'
+
+    - name: Restart nginx
+      shell: docker-compose -f /root/docker-compose.yml restart nginx

@@ -1,0 +1,37 @@
+version: '3.5'
+services:
+  nginx:
+    restart: always
+    image: "winnerokay/sna-app-nginx:latest"
+    ports:
+      - "80:80"
+    depends_on:
+      - adminpanel
+    volumes:
+      # - ../nginx/logs:/var/log/nginx
+      # - ../nginx/access.d:/etc/nginx/access.d
+      - django-static:/static
+      - /var/app/sport/media:/media:ro
+
+  adminpanel:
+    image: "winnerokay/sna-app:latest"
+    #   Wait for postgres to startup before running server
+    command: bash -c 'while !</dev/tcp/${POSTGRES_SERVER}/5432; do sleep 1; done; uvicorn adminpage.asgi:application --host 0.0.0.0 --port 8000 --workers 4 --lifespan off --proxy-headers'
+    restart: always
+    volumes:
+      - django-auth-preserve:/usr/local/lib/python${PYTHON_VERSION}/site-packages/django/contrib/auth/migrations/
+      - django-static:/static
+      - /var/app/sport/media:/uploaded_media
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_SERVER=${POSTGRES_SERVER}
+
+
+volumes:
+  django-static:
+  # required to preserve change to django.contrib.auth.models.Group class.
+  # (verbose_name added)
+  # since Innopolis adfs provides groupsid as universal identifier
+  # (group - can be either in Russian or English)
+  django-auth-preserve:
