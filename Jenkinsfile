@@ -2,6 +2,13 @@ pipeline {
   agent any
   stages {
     stage('Test') {
+      post {
+        cleanup {
+          echo 'Cleanup...'
+          sh 'docker-compose down -v --rmi all && rm docker-compose.yml'
+        }
+
+      }
       steps {
         echo 'Testing..'
         sh '''
@@ -19,12 +26,6 @@ pipeline {
           echo "done"
           '''
       }
-      post {
-        cleanup {
-          echo 'Cleanup...'
-          sh 'docker-compose down -v --rmi all && rm docker-compose.yml'
-        }
-      }
     }
 
     stage('Build') {
@@ -37,26 +38,27 @@ pipeline {
           dockerInstanceDjango = docker.build("winnerokay/sna-app", '-t latest --build-arg PYTHON_VERSION=$PYTHON_VERSION ./adminpage')
           dockerInstanceNginx = docker.build("winnerokay/sna-app-nginx", '-t latest ./nginx')
         }
+
       }
     }
-    stage('Migrate'){
+
+    stage('Migrate') {
       environment {
         ENV_FILE = credentials('production-envfile')
       }
-  
       steps {
         echo 'Making migrations to the db...'
-        sh ''' docker run --env-file $ENV_FILE -e POSTGRES_SERVER=$(getent hosts db_server | awk "{ print $1 }") winnerokay/sna-app:latest bash -c "python manage.py makemigrations && python manage.py migrate"'''
+        sh ' docker run --env-file $ENV_FILE -e POSTGRES_SERVER=$(getent hosts db_server | awk \'{ print $1 }\') winnerokay/sna-app:latest bash -c "python manage.py makemigrations && python manage.py migrate"'
       }
     }
-    
+
     stage('Push to registry') {
       environment {
         registryCredentialSet = 'dockerhub'
       }
       steps {
         echo 'Publishing....'
-        script{
+        script {
           docker.withRegistry('', registryCredentialSet){
             dockerInstanceDjango.push("${env.GIT_COMMIT}")
             dockerInstanceDjango.push("latest")
@@ -64,13 +66,16 @@ pipeline {
             dockerInstanceNginx.push("latest")
           }
         }
+
       }
     }
-    
-    stage('Deploy'){
+
+    stage('Deploy') {
       steps {
         echo 'Deploying...'
+        sh 'pwd'
       }
     }
+
   }
 }
