@@ -78,16 +78,6 @@ pipeline {
       steps {
         echo 'Deploying...'
         sh 'ls -la'
-        // sh 'ansible-playbook -i $ansibleInventoryFile -e "envfilePath=@$productionEnvfile" deploy_web.yml'
-        // sh 'mv \$productionEnvfile ./production_env'
-       
-        // ansiblePlaybook("deploy_web.yml"){
-        //   inventoryPath('$ansibleInventoryFile')
-        //   extraVars {
-        //     extraVar("envfilePath", "$productionEnvfile", false)
-        //   }
-        // }
-      
         ansiblePlaybook(
           playbook: "deploy_web.yml",
           inventory: "$ansibleInventoryFile",
