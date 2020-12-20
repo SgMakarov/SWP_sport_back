@@ -77,7 +77,6 @@ pipeline {
       }
       steps {
         echo 'Deploying...'
-        sh 'ls -la'
         ansiblePlaybook(
           playbook: "deploy_web.yml",
           inventory: "$ansibleInventoryFile",
